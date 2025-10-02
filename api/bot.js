@@ -1,5 +1,4 @@
 import axios from "axios";
-import FormData from "form-data";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
@@ -31,7 +30,6 @@ export default async function handler(req, res) {
       return res.status(200).send("Start command processed");
     }
 
-    // Detect audio file
     let fileId = null;
     if (update.message.audio) fileId = update.message.audio.file_id;
     else if (update.message.voice) fileId = update.message.voice.file_id;
@@ -49,21 +47,18 @@ export default async function handler(req, res) {
 
     console.log("🎵 Received audio file with ID:", fileId);
 
-    // Get file URL from Telegram
     const fileInfo = await axios.get(`${TELEGRAM_API}/getFile?file_id=${fileId}`);
     const filePath = fileInfo.data.result.file_path;
     const fileUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
+
     console.log("🔗 File URL:", fileUrl);
 
     console.log("⏳ Sending file to convert API...");
-    const apiRes = await axios.post(CONVERT_API, {
-      fileUrl: fileUrl,
-      speed: 0.05,
-      panDepth: 0.8
-    }, {
-      headers: { "Content-Type": "application/json" },
-      responseType: "arraybuffer"
-    });
+    const apiRes = await axios.post(
+      CONVERT_API,
+      { fileUrl, speed: 0.05, panDepth: 0.8 },
+      { headers: { "Content-Type": "application/json" }, responseType: "arraybuffer" }
+    );
 
     console.log("✅ Audio processed successfully");
 
@@ -72,26 +67,23 @@ export default async function handler(req, res) {
     form.append("chat_id", chatId);
     form.append("audio", outBuffer, "converted-8d.mp3");
 
-    console.log("📤 Sending converted audio to user...");
+    console.log("📤 Sending converted audio...");
     await axios.post(`${TELEGRAM_API}/sendAudio`, form, {
-      headers: form.getHeaders()
+      headers: form.getHeaders(),
     });
 
     console.log("🎉 Audio sent successfully!");
     res.status(200).send("OK");
-
   } catch (err) {
     console.error("❌ Error processing update:", err?.response?.data || err.message);
-
     try {
       await axios.post(`${TELEGRAM_API}/sendMessage`, {
         chat_id: req.body?.message?.chat?.id || 0,
-        text: "❌ Sorry, something went wrong while processing your file."
+        text: "❌ Sorry, something went wrong while processing your file.",
       });
     } catch (e) {
-      console.error("❌ Failed to send error message to user", e.message);
+      console.error("❌ Failed to send error message", e.message);
     }
-
-    res.status(200).send("Error");
+    res.status(500).send("Error");
   }
 }
