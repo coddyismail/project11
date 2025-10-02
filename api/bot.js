@@ -26,7 +26,7 @@ export default async function handler(req, res) {
       console.log("💬 Received /start command");
       await axios.post(`${TELEGRAM_API}/sendMessage`, {
         chat_id: chatId,
-        text: "👋 Hello! Send me an audio file or voice note and I'll convert it to 8D format 🎧",
+        text: "👋 Hello! I'm your 8D Audio Bot.\n\nSend me an audio file or voice note and I'll return it in 8D format 🎧",
       });
       return res.status(200).send("Start command processed");
     }
@@ -53,7 +53,6 @@ export default async function handler(req, res) {
     const fileInfo = await axios.get(`${TELEGRAM_API}/getFile?file_id=${fileId}`);
     const filePath = fileInfo.data.result.file_path;
     const fileUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
-
     console.log("🔗 File URL:", fileUrl);
 
     console.log("⏳ Sending file to convert API...");
@@ -69,12 +68,11 @@ export default async function handler(req, res) {
     console.log("✅ Audio processed successfully");
 
     const outBuffer = Buffer.from(apiRes.data);
-
     const form = new FormData();
     form.append("chat_id", chatId);
     form.append("audio", outBuffer, "converted-8d.mp3");
 
-    console.log("📤 Sending converted audio back to user...");
+    console.log("📤 Sending converted audio to user...");
     await axios.post(`${TELEGRAM_API}/sendAudio`, form, {
       headers: form.getHeaders()
     });
