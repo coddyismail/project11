@@ -1,39 +1,44 @@
-import axios from "axios";
 import fs from "fs";
 import path from "path";
+import axios from "axios";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 export default async function handler(req, res) {
-  console.log("API convert triggered");
-
   if (req.method !== "POST") {
     return res.status(200).send("Convert API is running...");
   }
 
   try {
     const { fileUrl, speed, panDepth } = req.body;
+    if (!fileUrl) return res.status(400).json({ error: "fileUrl is required" });
+
+    console.log("API convert triggered");
     console.log("🔗 File URL:", fileUrl);
     console.log("⚡ Speed:", speed, "Pan Depth:", panDepth);
 
+    // Download file
     console.log("📥 Downloading audio...");
-    const audioRes = await axios.get(fileUrl, { responseType: "arraybuffer" });
-    const inputBuffer = Buffer.from(audioRes.data);
+    const audioResponse = await axios.get(fileUrl, { responseType: "arraybuffer" });
+    const inputBuffer = Buffer.from(audioResponse.data);
 
-    const inputPath = path.join("/tmp", "input_audio");
-    const outputPath = path.join("/tmp", "output_audio.mp3");
+    const inputPath = path.join("/tmp", "input.mp3");
+    const outputPath = path.join("/tmp", "output.mp3");
+
     fs.writeFileSync(inputPath, inputBuffer);
 
     console.log("🎧 Converting audio...");
     await new Promise((resolve, reject) => {
       ffmpeg(inputPath)
-        .audioFilters(`apulsator=hz=${speed}`)
-        .outputOptions("-y")
-        .save(outputPath)
-        .on("end", resolve)
-        .on("error", reject);
+        .audioFilters([
+          `apulsator=hz=0.3`,
+          `atempo=${speed || 1.0}`,
+        ])
+        .on("error", (err) => reject(err))
+        .on("end", () => resolve(true))
+        .save(outputPath);
     });
 
     console.log("✅ Conversion complete");
@@ -42,7 +47,7 @@ export default async function handler(req, res) {
     res.setHeader("Content-Type", "audio/mpeg");
     res.send(outputBuffer);
   } catch (err) {
-    console.error("❌ Processing failed:", err.message);
+    console.error("❌ Conversion failed", err);
     res.status(500).json({ error: err.message });
   }
 }

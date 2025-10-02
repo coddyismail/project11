@@ -1,4 +1,5 @@
 import axios from "axios";
+import FormData from "form-data";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
@@ -63,11 +64,15 @@ export default async function handler(req, res) {
     console.log("✅ Audio processed successfully");
 
     const outBuffer = Buffer.from(apiRes.data);
-    const form = new FormData();
-    form.append("chat_id", chatId);
-    form.append("audio", outBuffer, "converted-8d.mp3");
 
     console.log("📤 Sending converted audio...");
+    const form = new FormData();
+    form.append("chat_id", chatId.toString());
+    form.append("audio", outBuffer, {
+      filename: "converted-8d.mp3",
+      contentType: "audio/mpeg",
+    });
+
     await axios.post(`${TELEGRAM_API}/sendAudio`, form, {
       headers: form.getHeaders(),
     });
