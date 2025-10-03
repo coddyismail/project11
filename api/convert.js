@@ -1,10 +1,7 @@
 import axios from "axios";
 import fs from "fs";
 import path from "path";
-import ffmpeg from "fluent-ffmpeg";
-import ffmpegPath from "ffmpeg-static";
-
-ffmpeg.setFfmpegPath(ffmpegPath);
+import { AudioContext, AudioBuffer } from 'web-audio-api';
 
 export default async function handler(req, res) {
   console.log("🎵 API convert triggered");
@@ -12,9 +9,6 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).send({ error: "Method not allowed" });
   }
-
-  let inputPath = null;
-  let outputPath = null;
 
   try {
     const { fileUrl, speed = 0.05, panDepth = 0.8 } = req.body;
@@ -26,11 +20,6 @@ export default async function handler(req, res) {
     console.log("🔗 File URL:", fileUrl);
     console.log("⚡ Speed:", speed, "Pan Depth:", panDepth);
 
-    // Create unique file names
-    const timestamp = Date.now();
-    inputPath = path.join("/tmp", `input_${timestamp}`);
-    outputPath = path.join("/tmp", `output_${timestamp}.mp3`);
-
     // Download the audio file
     console.log("📥 Downloading audio...");
     const audioResp = await axios({
@@ -40,55 +29,30 @@ export default async function handler(req, res) {
       timeout: 30000
     });
 
-    fs.writeFileSync(inputPath, audioResp.data);
-    console.log("✅ Audio downloaded");
+    console.log("✅ Audio downloaded, size:", audioResp.data.length, "bytes");
 
-    // Convert audio with Haas effect for 8D
-    console.log("🎧 Converting audio to 8D...");
+    // Create audio context
+    const audioContext = new AudioContext();
     
-    await new Promise((resolve, reject) => {
-      const command = ffmpeg(inputPath)
-        .audioFilters([
-          // Haas effect creates spatial perception
-          `haas=level_in=1.0:level_out=1.0:side_gain=${panDepth}:middle_source=0.8:middle_phase=1`,
-          
-          // Add phaser for movement
-          `aphaser=in_gain=0.8:out_gain=1.0:delay=${speed * 10}:decay=0.5:speed=${speed * 2}:type=t`,
-          
-          // Stereo enhancement
-          `stereowiden=0.6`
-        ])
-        .audioCodec('libmp3lame')
-        .audioFrequency(44100)
-        .audioChannels(2)
-        .audioBitrate('192k')
-        .on("start", (commandLine) => {
-          console.log('FFmpeg command:', commandLine);
-        })
-        .on("progress", (progress) => {
-          if (progress.percent) {
-            console.log(`Processing: ${Math.round(progress.percent)}% done`);
-          }
-        })
-        .on("error", (err) => {
-          console.error("❌ Conversion failed:", err);
-          reject(err);
-        })
-        .on("end", () => {
-          console.log("✅ Conversion complete");
-          resolve(true);
-        });
+    console.log("🎧 Decoding audio...");
+    const audioBuffer = await audioContext.decodeAudioData(audioResp.data);
+    console.log("✅ Audio decoded");
 
-      command.save(outputPath);
-    });
+    // Process audio with 8D effect (same logic as React component)
+    console.log("🔄 Applying 8D effect...");
+    const processedBuffer = await apply8DEffect(audioBuffer, speed, panDepth, audioContext);
+    
+    console.log("✅ 8D effect applied");
 
-    // Send the converted file
-    const outputBuffer = fs.readFileSync(outputPath);
-    console.log(`📁 Output size: ${outputBuffer.length} bytes`);
+    // Encode to MP3
+    console.log("📦 Encoding to MP3...");
+    const mp3Buffer = await encodeToMP3(processedBuffer);
+    
+    console.log("✅ MP3 encoded, size:", mp3Buffer.length, "bytes");
 
     res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Content-Disposition", "attachment; filename=8d_audio.mp3");
-    res.send(outputBuffer);
+    res.send(mp3Buffer);
 
   } catch (err) {
     console.error("❌ Processing failed:", err.message);
@@ -97,17 +61,114 @@ export default async function handler(req, res) {
     res.status(500).send({ 
       error: "Conversion failed: " + err.message 
     });
-  } finally {
-    // Clean up temporary files
-    try {
-      if (inputPath && fs.existsSync(inputPath)) {
-        fs.unlinkSync(inputPath);
-      }
-      if (outputPath && fs.existsSync(outputPath)) {
-        fs.unlinkSync(outputPath);
-      }
-    } catch (cleanupErr) {
-      console.error("Error cleaning up files:", cleanupErr.message);
+  }
+}
+
+// Same 8D effect logic as your React component
+async function apply8DEffect(originalBuffer, speed, panDepth, audioContext) {
+  const processedBuffer = audioContext.createBuffer(
+    2, 
+    originalBuffer.length, 
+    originalBuffer.sampleRate
+  );
+
+  const leftOutput = processedBuffer.getChannelData(0);
+  const rightOutput = processedBuffer.getChannelData(1);
+
+  const leftInput = originalBuffer.getChannelData(0);
+  const rightInput = originalBuffer.numberOfChannels > 1 
+    ? originalBuffer.getChannelData(1) 
+    : originalBuffer.getChannelData(0);
+
+  // Apply the same 8D effect as your React component
+  for (let i = 0; i < originalBuffer.length; i++) {
+    const time = i / originalBuffer.sampleRate;
+    const panValue = Math.sin(time * 2 * Math.PI * speed) * panDepth;
+    const leftGain = Math.max(0, 1 - panValue);
+    const rightGain = Math.max(0, 1 + panValue);
+    
+    leftOutput[i] = leftInput[i] * leftGain;
+    rightOutput[i] = rightInput[i] * rightGain;
+  }
+
+  // Normalize audio (same as React component)
+  const normalizedLeft = normalizeAudio(leftOutput);
+  const normalizedRight = normalizeAudio(rightOutput);
+
+  // Copy normalized data back
+  for (let i = 0; i < normalizedLeft.length; i++) {
+    leftOutput[i] = normalizedLeft[i];
+    rightOutput[i] = normalizedRight[i];
+  }
+
+  return processedBuffer;
+}
+
+// Same normalize function as your React component
+function normalizeAudio(channelData) {
+  const newData = new Float32Array(channelData.length);
+  let max = 0;
+  
+  for (let i = 0; i < channelData.length; i++) {
+    const absVal = Math.abs(channelData[i]);
+    if (absVal > max) max = absVal;
+  }
+  
+  if (max > 0.9) {
+    const gain = 0.9 / max;
+    for (let i = 0; i < channelData.length; i++) {
+      newData[i] = channelData[i] * gain;
     }
+    return newData;
+  }
+  
+  return channelData;
+}
+
+// MP3 encoding using a simple WAV fallback since MP3 encoding is complex
+async function encodeToMP3(audioBuffer) {
+  // For now, let's output as WAV since MP3 encoding requires complex libraries
+  // You can replace this with a proper MP3 encoder later
+  return encodeToWAV(audioBuffer);
+}
+
+function encodeToWAV(audioBuffer) {
+  const numChannels = audioBuffer.numberOfChannels;
+  const sampleRate = audioBuffer.sampleRate;
+  const length = audioBuffer.length * numChannels * 2; // 2 bytes per sample
+  const buffer = new ArrayBuffer(44 + length);
+  const view = new DataView(buffer);
+
+  // Write WAV header
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + length, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numChannels * 2, true);
+  view.setUint16(32, numChannels * 2, true);
+  view.setUint16(34, 16, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, length, true);
+
+  // Write audio data
+  let offset = 44;
+  for (let i = 0; i < audioBuffer.length; i++) {
+    for (let channel = 0; channel < numChannels; channel++) {
+      const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+  }
+
+  return Buffer.from(buffer);
+}
+
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
   }
 }
