@@ -6,182 +6,210 @@ const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const CONVERT_API = "https://project911-flame.vercel.app/api/convert";
 
 export default async function handler(req, res) {
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
-    return res.status(200).send("Bot is running...");
+    return res.status(200).json({ status: "Bot is running..." });
   }
 
   try {
     const update = req.body;
-    console.log("📨 Update received:", JSON.stringify(update, null, 2));
+    console.log("📨 Update received");
 
     if (!update.message) {
-      return res.status(200).send("No message");
+      return res.status(200).json({ status: "No message" });
     }
 
     const chatId = update.message.chat.id;
-    const text = update.message.text;
+    const text = update.message.text || "";
+    const firstName = update.message.chat.first_name || "there";
 
-    // Handle /start command
-    if (text === "/start") {
+    // Handle commands
+    if (text.startsWith('/')) {
+      if (text === '/start') {
+        await axios.post(`${TELEGRAM_API}/sendMessage`, {
+          chat_id: chatId,
+          text: `👋 Hello ${firstName}! Welcome to the 8D Audio Converter Bot! 🎧\n\nJust send me any audio file (MP3, voice message, etc.) and I'll process it for you.\n\nFeatures:\n• Convert audio to 8D effect\n• Support for various audio formats\n• Fast processing\n\nSend an audio file to get started! 🎵`,
+          parse_mode: "HTML"
+        });
+        return res.status(200).json({ status: "Start processed" });
+      }
+
+      if (text === '/help') {
+        await axios.post(`${TELEGRAM_API}/sendMessage`, {
+          chat_id: chatId,
+          text: `🤖 <b>How to use this bot:</b>\n\n1. Send an audio file (MP3, OGG, M4A, etc.)\n2. Send a voice message\n3. Send audio as a document\n\nI'll process it and send back the audio with enhanced sound!\n\n<b>Supported formats:</b>\n• Audio files (up to 20MB)\n• Voice messages\n• Audio documents\n\n<b>Commands:</b>\n/start - Welcome message\n/help - This help message\n\nEnjoy the music! 🎧`,
+          parse_mode: "HTML"
+        });
+        return res.status(200).json({ status: "Help processed" });
+      }
+
+      // Unknown command
       await axios.post(`${TELEGRAM_API}/sendMessage`, {
         chat_id: chatId,
-        text: "👋 Welcome to 8D Audio Converter Bot!\n\nSend me an audio file (MP3, voice message, or any audio) and I'll convert it to amazing 8D audio! 🎧\n\nJust upload any audio file and wait for the magic! ✨",
-        parse_mode: "HTML"
+        text: "❓ Unknown command. Send /help for instructions or just send me an audio file! 🎵"
       });
-      return res.status(200).send("Start processed");
+      return res.status(200).json({ status: "Unknown command" });
     }
 
-    // Handle /help command
-    if (text === "/help") {
-      await axios.post(`${TELEGRAM_API}/sendMessage`, {
-        chat_id: chatId,
-        text: "🤖 <b>How to use:</b>\n\n• Send any audio file (MP3, OGG, etc.)\n• Send a voice message\n• Send audio as document\n\nI'll convert it to 8D audio with that cool rotating effect! 🎵\n\n<b>Pro tip:</b> Use headphones for the best experience! 🎧",
-        parse_mode: "HTML"
-      });
-      return res.status(200).send("Help processed");
-    }
-
+    // Handle audio files
     let fileId = null;
     let fileName = "audio";
-    let fileType = "audio";
+    let fileType = "unknown";
 
-    // Detect audio file type
     if (update.message.audio) {
       fileId = update.message.audio.file_id;
-      fileName = update.message.audio.file_name || "audio";
+      fileName = update.message.audio.file_name || "audio_file";
       fileType = "audio";
       console.log("🎵 Audio file detected:", fileName);
     } else if (update.message.voice) {
       fileId = update.message.voice.file_id;
-      fileName = "voice-message.mp3";
+      fileName = "voice_message";
       fileType = "voice";
       console.log("🎤 Voice message detected");
-    } else if (update.message.document && update.message.document.mime_type.startsWith("audio")) {
-      fileId = update.message.document.file_id;
-      fileName = update.message.document.file_name || "audio";
-      fileType = "document";
-      console.log("📄 Audio document detected:", fileName);
+    } else if (update.message.document) {
+      const mimeType = update.message.document.mime_type || "";
+      if (mimeType.startsWith("audio/")) {
+        fileId = update.message.document.file_id;
+        fileName = update.message.document.file_name || "audio_document";
+        fileType = "document";
+        console.log("📄 Audio document detected:", fileName);
+      }
     }
 
     if (!fileId) {
       await axios.post(`${TELEGRAM_API}/sendMessage`, {
         chat_id: chatId,
-        text: "📩 Please send me an audio file, voice note, or audio document to convert to 8D audio!\n\nUse /help for more info.",
-        parse_mode: "HTML"
+        text: "🎵 Please send me an audio file, voice message, or audio document to process!\n\nUse /help for more information."
       });
-      return res.status(200).send("No file");
+      return res.status(200).json({ status: "No audio file" });
     }
 
-    // Send "processing" message
+    // Send processing message
     const processingMessage = await axios.post(`${TELEGRAM_API}/sendMessage`, {
       chat_id: chatId,
-      text: "⏳ Processing your audio... This may take a moment depending on the file size. Please wait! 🔄",
+      text: "⏳ Downloading and processing your audio... Please wait a moment! 🔄",
       parse_mode: "HTML"
     });
 
+    let processingMessageId = processingMessage.data.result.message_id;
+
     try {
       // Get file info from Telegram
-      console.log("📁 Getting file info...");
-      const fileInfo = await axios.get(`${TELEGRAM_API}/getFile?file_id=${fileId}`);
-      const filePath = fileInfo.data.result.file_path;
+      console.log("📁 Getting file info from Telegram...");
+      const fileInfoResponse = await axios.get(`${TELEGRAM_API}/getFile?file_id=${fileId}`);
+      const fileInfo = fileInfoResponse.data;
+      
+      if (!fileInfo.ok) {
+        throw new Error("Failed to get file info from Telegram");
+      }
+
+      const filePath = fileInfo.result.file_path;
       const fileUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
+      const fileSize = fileInfo.result.file_size;
 
       console.log("🔗 File URL:", fileUrl);
-      console.log("📊 File size:", fileInfo.data.result.file_size, "bytes");
+      console.log("📊 File size:", fileSize, "bytes");
+      console.log("🗂️ File type:", fileType);
 
-      // Prepare conversion parameters (same as React component)
-      const convertParams = {
-        fileUrl,
-        speed: 0.05,    // Same as React component default
-        panDepth: 0.8   // Same as React component default
-      };
-
-      console.log("⚙️ Conversion parameters:", convertParams);
-
-      // Send to convert API
-      console.log("⏳ Sending to convert API...");
-      const convertResponse = await axios.post(CONVERT_API, convertParams, {
-        responseType: "arraybuffer",
-        timeout: 120000 // 2 minutes timeout for conversion
+      // Update processing message
+      await axios.post(`${TELEGRAM_API}/editMessageText`, {
+        chat_id: chatId,
+        message_id: processingMessageId,
+        text: "⏳ Processing your audio... Converting to 8D effect 🎧"
       });
 
-      console.log("✅ Conversion successful!");
-      console.log("📦 Converted file size:", convertResponse.data.length, "bytes");
+      // Prepare conversion parameters
+      const convertParams = {
+        fileUrl: fileUrl,
+        speed: 0.05,
+        panDepth: 0.8
+      };
 
-      // Generate output filename
-      const originalName = fileName.replace(/\.[^/.]+$/, ""); // Remove extension
-      const outputFileName = `8D_${originalName}.mp3`;
+      console.log("⚙️ Sending to converter API...");
+
+      // Send to convert API
+      const convertResponse = await axios.post(CONVERT_API, convertParams, {
+        responseType: "arraybuffer",
+        timeout: 60000 // 60 seconds timeout
+      });
+
+      console.log("✅ Conversion successful! Response size:", convertResponse.data.length, "bytes");
+
+      // Update processing message
+      await axios.post(`${TELEGRAM_API}/editMessageText`, {
+        chat_id: chatId,
+        message_id: processingMessageId,
+        text: "⏳ Uploading processed audio... 📤"
+      });
+
+      // Prepare output filename
+      const baseName = fileName.replace(/\.[^/.]+$/, ""); // Remove extension
+      const outputFileName = `8D_${baseName}.mp3`;
 
       // Send converted audio back to user
-      console.log("📤 Sending converted audio to user...");
-      
       const formData = new FormData();
       formData.append("chat_id", chatId);
       formData.append("audio", convertResponse.data, {
         filename: outputFileName,
         contentType: "audio/mpeg"
       });
-      formData.append("title", "8D Audio Converted");
-      formData.append("caption", "🎧 Your 8D audio is ready! Best experienced with headphones. Enjoy! ✨");
+      formData.append("title", "8D Audio Processed");
+      formData.append("performer", "8D Audio Bot");
+      formData.append("caption", "🎧 Your processed audio is ready! Enjoy the enhanced sound experience!");
 
+      console.log("📤 Sending audio to Telegram...");
       await axios.post(`${TELEGRAM_API}/sendAudio`, formData, {
-        headers: {
-          ...formData.getHeaders(),
-        },
+        headers: formData.getHeaders(),
         timeout: 30000
       });
 
       console.log("✅ Audio sent successfully!");
 
-      // Delete processing message
-      await axios.post(`${TELEGRAM_API}/deleteMessage`, {
+      // Update processing message to success
+      await axios.post(`${TELEGRAM_API}/editMessageText`, {
         chat_id: chatId,
-        message_id: processingMessage.data.result.message_id
-      });
-
-      // Send success message
-      await axios.post(`${TELEGRAM_API}/sendMessage`, {
-        chat_id: chatId,
-        text: "✅ <b>Conversion Complete!</b>\n\nYour 8D audio has been successfully processed and sent! 🎉\n\n<b>Tip:</b> Use headphones for the full immersive experience! 🎧\n\nSend another audio file to convert more!",
+        message_id: processingMessageId,
+        text: "✅ <b>Processing Complete!</b>\n\nYour audio has been successfully processed! 🎉\n\nSend another audio file to continue! 🎵",
         parse_mode: "HTML"
       });
 
-      res.status(200).send("OK");
+      return res.status(200).json({ status: "Success" });
 
     } catch (conversionError) {
       console.error("❌ Conversion error:", conversionError.message);
-      
-      // Delete processing message
-      await axios.post(`${TELEGRAM_API}/deleteMessage`, {
-        chat_id: chatId,
-        message_id: processingMessage.data.result.message_id
-      });
 
-      // Send specific error messages based on error type
-      let errorMessage = "❌ Sorry, something went wrong while processing your file. Please try again with a different audio file.";
-      
+      // Error handling with specific messages
+      let errorMessage = "❌ Sorry, I couldn't process your audio file. Please try again with a different file.";
+
       if (conversionError.code === 'ECONNABORTED') {
-        errorMessage = "⏰ The conversion took too long. Please try again with a shorter audio file.";
+        errorMessage = "⏰ Processing took too long. Please try again with a shorter audio file.";
       } else if (conversionError.response?.status === 413) {
-        errorMessage = "📁 The audio file is too large. Please try with a smaller file (under 20MB).";
-      } else if (conversionError.message?.includes('decode')) {
-        errorMessage = "🎵 I couldn't process this audio format. Please try with a different audio file (MP3, OGG, etc.).";
+        errorMessage = "📁 File too large. Please try with a smaller audio file (under 20MB).";
+      } else if (conversionError.response?.status === 404) {
+        errorMessage = "🔍 Could not find the audio file. Please send it again.";
+      } else if (conversionError.message?.includes('format') || conversionError.message?.includes('decode')) {
+        errorMessage = "🎵 Unsupported audio format. Please try with MP3, OGG, or other common audio formats.";
       }
 
-      await axios.post(`${TELEGRAM_API}/sendMessage`, {
+      // Update processing message with error
+      await axios.post(`${TELEGRAM_API}/editMessageText`, {
         chat_id: chatId,
-        text: errorMessage,
-        parse_mode: "HTML"
+        message_id: processingMessageId,
+        text: errorMessage
       });
 
-      res.status(200).send("Conversion error");
+      return res.status(200).json({ status: "Conversion error" });
     }
 
-  } catch (err) {
-    console.error("❌ General bot error:", err.message);
-    console.error(err.stack);
-    
+  } catch (error) {
+    console.error("❌ Bot handler error:", error.message);
+
     try {
+      // Try to send error message to user
       if (req.body?.message?.chat?.id) {
         await axios.post(`${TELEGRAM_API}/sendMessage`, {
           chat_id: req.body.message.chat.id,
@@ -189,10 +217,10 @@ export default async function handler(req, res) {
           parse_mode: "HTML"
         });
       }
-    } catch (telegramErr) {
-      console.error("Failed to send error message:", telegramErr.message);
+    } catch (telegramError) {
+      console.error("Failed to send error message:", telegramError.message);
     }
-    
-    res.status(200).send("Error");
+
+    return res.status(200).json({ status: "Server error" });
   }
 }
