@@ -12,7 +12,11 @@ export default async function handler(req, res) {
 
   try {
     const update = req.body;
-    if (!update.message) return res.status(200).send("No message");
+    console.log("📨 Update received:", JSON.stringify(update, null, 2));
+
+    if (!update.message) {
+      return res.status(200).send("No message");
+    }
 
     const chatId = update.message.chat.id;
     const text = update.message.text;
@@ -26,10 +30,18 @@ export default async function handler(req, res) {
     }
 
     let fileId = null;
-    if (update.message.audio) fileId = update.message.audio.file_id;
-    else if (update.message.voice) fileId = update.message.voice.file_id;
-    else if (update.message.document && update.message.document.mime_type.startsWith("audio"))
+    let fileName = "audio";
+
+    if (update.message.audio) {
+      fileId = update.message.audio.file_id;
+      fileName = update.message.audio.file_name || "audio";
+    } else if (update.message.voice) {
+      fileId = update.message.voice.file_id;
+      fileName = "voice.mp3";
+    } else if (update.message.document && update.message.document.mime_type.startsWith("audio")) {
       fileId = update.message.document.file_id;
+      fileName = update.message.document.file_name || "audio";
+    }
 
     if (!fileId) {
       await axios.post(`${TELEGRAM_API}/sendMessage`, {
@@ -39,41 +51,59 @@ export default async function handler(req, res) {
       return res.status(200).send("No file");
     }
 
+    console.log("📁 File ID:", fileId);
+
+    // Get file info from Telegram
     const fileInfo = await axios.get(`${TELEGRAM_API}/getFile?file_id=${fileId}`);
     const filePath = fileInfo.data.result.file_path;
     const fileUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
 
     console.log("🔗 File URL:", fileUrl);
 
-    const form = new FormData();
-    form.append("fileUrl", fileUrl);
-    form.append("speed", "0.8");
-    form.append("panDepth", "0.8");
-
+    // Send to convert API
     console.log("⏳ Sending to convert API...");
-    const apiRes = await axios.post(CONVERT_API, form, {
-      headers: form.getHeaders(),
-      responseType: "arraybuffer",
+    const convertResponse = await axios.post(CONVERT_API, {
+      fileUrl,
+      speed: 0.8,
+      panDepth: 0.8
+    }, {
+      responseType: "arraybuffer"
     });
 
-    const outBuffer = Buffer.from(apiRes.data);
-    const outForm = new FormData();
-    outForm.append("chat_id", chatId);
-    outForm.append("audio", outBuffer, "converted-8d.mp3");
+    console.log("✅ Conversion successful, sending audio back...");
 
-    await axios.post(`${TELEGRAM_API}/sendAudio`, outForm, {
-      headers: outForm.getHeaders(),
+    // Send converted audio back to user
+    const formData = new FormData();
+    formData.append("chat_id", chatId);
+    formData.append("audio", convertResponse.data, {
+      filename: `8d_${fileName}`,
+      contentType: "audio/mpeg"
     });
 
+    await axios.post(`${TELEGRAM_API}/sendAudio`, formData, {
+      headers: {
+        ...formData.getHeaders(),
+      },
+    });
+
+    console.log("✅ Audio sent successfully");
     res.status(200).send("OK");
+
   } catch (err) {
     console.error("❌ Error processing update:", err.message);
+    console.error(err.stack);
+    
     try {
-      await axios.post(`${TELEGRAM_API}/sendMessage`, {
-        chat_id: req.body?.message?.chat?.id || 0,
-        text: "❌ Sorry, something went wrong while processing your file.",
-      });
-    } catch {}
+      if (req.body?.message?.chat?.id) {
+        await axios.post(`${TELEGRAM_API}/sendMessage`, {
+          chat_id: req.body.message.chat.id,
+          text: "❌ Sorry, something went wrong while processing your file. Please try again.",
+        });
+      }
+    } catch (telegramErr) {
+      console.error("Failed to send error message:", telegramErr.message);
+    }
+    
     res.status(200).send("Error");
   }
 }
