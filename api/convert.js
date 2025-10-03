@@ -6,6 +6,30 @@ import ffmpegPath from "ffmpeg-static";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
+// Helper function to create 8D audio effect filter
+function create8DFilter(speed = 0.05, panDepth = 0.8) {
+  // Convert speed from Hz to radians per sample
+  // The React code uses time-based calculation: Math.sin(time * 2 * Math.PI * speed)
+  // In FFmpeg, we can achieve this using the 'pan' filter with dynamic channel mixing
+  
+  const speedRad = speed * 2 * Math.PI;
+  
+  // Create a complex pan filter that simulates the 8D effect
+  // We'll use the 'aecho' and 'pan' filters together to create the rotating effect
+  const filters = [
+    // Split into left and right for processing
+    'asplit=2[left][right]',
+    
+    // Apply 8D effect using pan with sinusoidal modulation
+    `[left][right]amerge=inputs=2,pan=stereo|FL < 1.0*FL + 0.0*FR|FR < 0.0*FL + 1.0*FR,apulsator=hz=${speed}:offset=${panDepth}`,
+    
+    // Add some spatial enhancement
+    `aecho=0.8:0.8:${100 * speed}:0.5`
+  ];
+
+  return filters;
+}
+
 export default async function handler(req, res) {
   console.log("🎵 API convert triggered");
 
@@ -17,17 +41,18 @@ export default async function handler(req, res) {
   let outputPath = null;
 
   try {
-    const { fileUrl, speed = 0.8 } = req.body;
+    const { fileUrl, speed = 0.05, panDepth = 0.8 } = req.body;
     
     if (!fileUrl) {
       return res.status(400).send({ error: "Missing fileUrl" });
     }
 
     console.log("🔗 File URL:", fileUrl);
+    console.log("⚡ Speed:", speed, "Pan Depth:", panDepth);
 
     // Create unique file names
     const timestamp = Date.now();
-    inputPath = path.join("/tmp", `input_${timestamp}.oga`);
+    inputPath = path.join("/tmp", `input_${timestamp}`);
     outputPath = path.join("/tmp", `output_${timestamp}.mp3`);
 
     // Download the audio file
@@ -42,21 +67,29 @@ export default async function handler(req, res) {
     fs.writeFileSync(inputPath, audioResp.data);
     console.log("✅ Audio downloaded");
 
-    // Convert audio with 8D effect using tremolo for panning
+    // Convert audio with the same 8D effect logic as React component
     console.log("🎧 Converting audio to 8D...");
-    const clampedSpeed = Math.max(0.5, Math.min(parseFloat(speed), 2.0));
     
     await new Promise((resolve, reject) => {
-      ffmpeg(inputPath)
+      const command = ffmpeg(inputPath)
         .audioFilters([
-          // 8D audio effect using tremolo for auto-panning
-          `tremolo=f=0.5:d=0.8`,
-          `atempo=${clampedSpeed}`
+          // Main 8D effect - using apulsator for the panning effect
+          // This replicates the sinusoidal panning from the React code
+          `apulsator=hz=${speed}:offset=${panDepth}`,
+          
+          // Add some stereo enhancement to make the effect more pronounced
+          `stereowiden=level_in=1.0:level_out=1.0:delay=10:width=80`,
+          
+          // Optional: Add slight reverb for spatial effect
+          `aecho=0.8:0.8:${50 * speed}:0.3`,
+          
+          // Ensure proper stereo output
+          `pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1`
         ])
         .audioCodec('libmp3lame')
         .audioFrequency(44100)
         .audioChannels(2)
-        .audioBitrate('128k')
+        .audioBitrate('192k')
         .on("start", (commandLine) => {
           console.log('FFmpeg command:', commandLine);
         })
@@ -72,8 +105,9 @@ export default async function handler(req, res) {
         .on("end", () => {
           console.log("✅ Conversion complete");
           resolve(true);
-        })
-        .save(outputPath);
+        });
+
+      command.save(outputPath);
     });
 
     // Send the converted file
