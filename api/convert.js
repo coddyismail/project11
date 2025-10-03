@@ -43,22 +43,20 @@ export default async function handler(req, res) {
     fs.writeFileSync(inputPath, audioResp.data);
     console.log("✅ Audio downloaded");
 
-    // Convert audio with dynamic panning effect
+    // Convert audio with Haas effect for 8D
     console.log("🎧 Converting audio to 8D...");
     
     await new Promise((resolve, reject) => {
-      // Calculate the period for the panning effect (in samples)
-      const sampleRate = 44100;
-      const periodSamples = sampleRate / speed;
-      
       const command = ffmpeg(inputPath)
-        .complexFilter([
-          // Create dynamic panning using expressions
-          // This mimics: leftGain = 1 - sin(2π * speed * t) * panDepth
-          //              rightGain = 1 + sin(2π * speed * t) * panDepth
-          `pan=stereo|
-           FL < ${1 - panDepth}*FC + ${panDepth}*FC*sin(2*PI*${speed}*t)|
-           FR < ${1 - panDepth}*FC + ${panDepth}*FC*sin(2*PI*${speed}*t+PI)`
+        .audioFilters([
+          // Haas effect creates spatial perception
+          `haas=level_in=1.0:level_out=1.0:side_gain=${panDepth}:middle_source=0.8:middle_phase=1`,
+          
+          // Add phaser for movement
+          `aphaser=in_gain=0.8:out_gain=1.0:delay=${speed * 10}:decay=0.5:speed=${speed * 2}:type=t`,
+          
+          // Stereo enhancement
+          `stereowiden=0.6`
         ])
         .audioCodec('libmp3lame')
         .audioFrequency(44100)
