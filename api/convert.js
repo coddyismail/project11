@@ -2,6 +2,7 @@ import axios from "axios";
 import fs from "fs";
 import path from "path";
 import { AudioContext, AudioBuffer } from 'web-audio-api';
+import { Encoder } from 'node-lame';
 
 export default async function handler(req, res) {
   console.log("🎵 API convert triggered");
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
       method: 'GET',
       url: fileUrl,
       responseType: 'arraybuffer',
-      timeout: 30000
+      timeout: 60000 // Increase timeout for larger files
     });
 
     console.log("✅ Audio downloaded, size:", audioResp.data.length, "bytes");
@@ -36,7 +37,7 @@ export default async function handler(req, res) {
     
     console.log("🎧 Decoding audio...");
     const audioBuffer = await audioContext.decodeAudioData(audioResp.data);
-    console.log("✅ Audio decoded");
+    console.log("✅ Audio decoded - duration:", audioBuffer.duration, "seconds, sample rate:", audioBuffer.sampleRate);
 
     // Process audio with 8D effect (same logic as React component)
     console.log("🔄 Applying 8D effect...");
@@ -44,10 +45,13 @@ export default async function handler(req, res) {
     
     console.log("✅ 8D effect applied");
 
-    // Encode to MP3
-    console.log("📦 Encoding to MP3...");
-    const mp3Buffer = await encodeToMP3(processedBuffer);
-    
+    // Encode to WAV first, then convert to MP3
+    console.log("📦 Encoding to WAV...");
+    const wavBuffer = encodeToWAV(processedBuffer);
+    console.log("✅ WAV encoded, size:", wavBuffer.length, "bytes");
+
+    console.log("🎹 Converting WAV to MP3...");
+    const mp3Buffer = await encodeWAVToMP3(wavBuffer, processedBuffer.sampleRate);
     console.log("✅ MP3 encoded, size:", mp3Buffer.length, "bytes");
 
     res.setHeader("Content-Type", "audio/mpeg");
@@ -66,8 +70,16 @@ export default async function handler(req, res) {
 
 // Same 8D effect logic as your React component
 async function apply8DEffect(originalBuffer, speed, panDepth, audioContext) {
+  console.log("🎛️ Applying 8D effect with:", {
+    length: originalBuffer.length,
+    sampleRate: originalBuffer.sampleRate,
+    channels: originalBuffer.numberOfChannels,
+    speed,
+    panDepth
+  });
+
   const processedBuffer = audioContext.createBuffer(
-    2, 
+    2, // Always output stereo
     originalBuffer.length, 
     originalBuffer.sampleRate
   );
@@ -75,11 +87,13 @@ async function apply8DEffect(originalBuffer, speed, panDepth, audioContext) {
   const leftOutput = processedBuffer.getChannelData(0);
   const rightOutput = processedBuffer.getChannelData(1);
 
+  // Get input channels (handle mono files)
   const leftInput = originalBuffer.getChannelData(0);
   const rightInput = originalBuffer.numberOfChannels > 1 
     ? originalBuffer.getChannelData(1) 
-    : originalBuffer.getChannelData(0);
+    : originalBuffer.getChannelData(0); // Use same channel for mono
 
+  console.log("🔄 Processing samples...");
   // Apply the same 8D effect as your React component
   for (let i = 0; i < originalBuffer.length; i++) {
     const time = i / originalBuffer.sampleRate;
@@ -91,6 +105,7 @@ async function apply8DEffect(originalBuffer, speed, panDepth, audioContext) {
     rightOutput[i] = rightInput[i] * rightGain;
   }
 
+  console.log("✅ Samples processed, normalizing audio...");
   // Normalize audio (same as React component)
   const normalizedLeft = normalizeAudio(leftOutput);
   const normalizedRight = normalizeAudio(rightOutput);
@@ -101,6 +116,7 @@ async function apply8DEffect(originalBuffer, speed, panDepth, audioContext) {
     rightOutput[i] = normalizedRight[i];
   }
 
+  console.log("🎉 8D effect completed");
   return processedBuffer;
 }
 
@@ -114,25 +130,24 @@ function normalizeAudio(channelData) {
     if (absVal > max) max = absVal;
   }
   
+  console.log("🔊 Normalizing - max amplitude:", max);
+  
   if (max > 0.9) {
     const gain = 0.9 / max;
+    console.log("📈 Applying gain:", gain);
     for (let i = 0; i < channelData.length; i++) {
       newData[i] = channelData[i] * gain;
     }
     return newData;
   }
   
+  console.log("ℹ️ No normalization needed");
   return channelData;
 }
 
-// MP3 encoding using a simple WAV fallback since MP3 encoding is complex
-async function encodeToMP3(audioBuffer) {
-  // For now, let's output as WAV since MP3 encoding requires complex libraries
-  // You can replace this with a proper MP3 encoder later
-  return encodeToWAV(audioBuffer);
-}
-
+// WAV encoding function
 function encodeToWAV(audioBuffer) {
+  console.log("💿 Encoding to WAV...");
   const numChannels = audioBuffer.numberOfChannels;
   const sampleRate = audioBuffer.sampleRate;
   const length = audioBuffer.length * numChannels * 2; // 2 bytes per sample
@@ -145,12 +160,12 @@ function encodeToWAV(audioBuffer) {
   writeString(view, 8, 'WAVE');
   writeString(view, 12, 'fmt ');
   view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
+  view.setUint16(20, 1, true); // PCM format
   view.setUint16(22, numChannels, true);
   view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * numChannels * 2, true);
-  view.setUint16(32, numChannels * 2, true);
-  view.setUint16(34, 16, true);
+  view.setUint32(28, sampleRate * numChannels * 2, true); // byte rate
+  view.setUint16(32, numChannels * 2, true); // block align
+  view.setUint16(34, 16, true); // bits per sample
   writeString(view, 36, 'data');
   view.setUint32(40, length, true);
 
@@ -164,7 +179,37 @@ function encodeToWAV(audioBuffer) {
     }
   }
 
+  console.log("✅ WAV encoding complete");
   return Buffer.from(buffer);
+}
+
+// MP3 encoding using node-lame
+async function encodeWAVToMP3(wavBuffer, sampleRate) {
+  console.log("🎹 Starting MP3 encoding...");
+  
+  try {
+    const encoder = new Encoder({
+      output: Buffer.alloc(0), // we'll get buffer output
+      bitrate: 192,
+      channels: 2,
+      sampleRate: sampleRate,
+      quality: 2 // 0=best, 9=worst
+    });
+
+    console.log("🔧 Encoder configured, setting buffer...");
+    await encoder.setBuffer(wavBuffer);
+    
+    console.log("⚙️ Encoding to MP3...");
+    await encoder.encode();
+    
+    const mp3Buffer = encoder.getBuffer();
+    console.log("✅ MP3 encoding successful");
+    
+    return mp3Buffer;
+  } catch (error) {
+    console.error("❌ MP3 encoding failed:", error);
+    throw new Error(`MP3 encoding failed: ${error.message}`);
+  }
 }
 
 function writeString(view, offset, string) {
