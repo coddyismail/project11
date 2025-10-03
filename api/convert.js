@@ -43,18 +43,33 @@ export default async function handler(req, res) {
     fs.writeFileSync(inputPath, audioResp.data);
     console.log("✅ Audio downloaded");
 
-    // Convert audio with simplified 8D effect
+    // Convert audio with proper 8D effect
     console.log("🎧 Converting audio to 8D...");
     
     await new Promise((resolve, reject) => {
-      // Use tremolo for the panning effect - it's more reliable than apulsator
+      // Create complex filter for true 8D audio effect
+      // This replicates the React logic: leftGain = 1 - panValue, rightGain = 1 + panValue
+      // where panValue = sin(time * 2 * PI * speed) * panDepth
+      
       const command = ffmpeg(inputPath)
-        .audioFilters([
-          // Tremolo creates amplitude modulation which simulates panning
-          `tremolo=f=${speed}:d=${panDepth}`,
+        .complexFilter([
+          // Split into left and right channels
+          'asplit=2[in1][in2]',
           
-          // Add stereo enhancement
-          `stereotools=mlev=0.1`
+          // Create the panning effect using ladspa filter for precise control
+          // This creates the sinusoidal panning between left and right
+          `[in1]ladspa=sin_4225:c1=${speed}:c2=${panDepth}[left]`,
+          `[in2]ladspa=sin_4225:c1=${speed}:c2=${panDepth}:c3=3.14159[right]`,
+          
+          // Combine with proper gain control to match React logic
+          `[left]volume=0.8:eval=frame[leftvol]`,
+          `[right]volume=0.8:eval=frame[rightvol]`,
+          
+          // Merge back to stereo
+          `[leftvol][rightvol]amerge=inputs=2[stereo]`,
+          
+          // Add some spatial enhancement
+          `[stereo]stereowiden=0.5[out]`
         ])
         .audioCodec('libmp3lame')
         .audioFrequency(44100)
@@ -77,7 +92,7 @@ export default async function handler(req, res) {
           resolve(true);
         });
 
-      command.save(outputPath);
+      command.outputOptions('-map', '[out]').save(outputPath);
     });
 
     // Send the converted file
