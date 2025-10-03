@@ -43,33 +43,22 @@ export default async function handler(req, res) {
     fs.writeFileSync(inputPath, audioResp.data);
     console.log("✅ Audio downloaded");
 
-    // Convert audio with proper 8D effect
+    // Convert audio with dynamic panning effect
     console.log("🎧 Converting audio to 8D...");
     
     await new Promise((resolve, reject) => {
-      // Create complex filter for true 8D audio effect
-      // This replicates the React logic: leftGain = 1 - panValue, rightGain = 1 + panValue
-      // where panValue = sin(time * 2 * PI * speed) * panDepth
+      // Calculate the period for the panning effect (in samples)
+      const sampleRate = 44100;
+      const periodSamples = sampleRate / speed;
       
       const command = ffmpeg(inputPath)
         .complexFilter([
-          // Split into left and right channels
-          'asplit=2[in1][in2]',
-          
-          // Create the panning effect using ladspa filter for precise control
-          // This creates the sinusoidal panning between left and right
-          `[in1]ladspa=sin_4225:c1=${speed}:c2=${panDepth}[left]`,
-          `[in2]ladspa=sin_4225:c1=${speed}:c2=${panDepth}:c3=3.14159[right]`,
-          
-          // Combine with proper gain control to match React logic
-          `[left]volume=0.8:eval=frame[leftvol]`,
-          `[right]volume=0.8:eval=frame[rightvol]`,
-          
-          // Merge back to stereo
-          `[leftvol][rightvol]amerge=inputs=2[stereo]`,
-          
-          // Add some spatial enhancement
-          `[stereo]stereowiden=0.5[out]`
+          // Create dynamic panning using expressions
+          // This mimics: leftGain = 1 - sin(2π * speed * t) * panDepth
+          //              rightGain = 1 + sin(2π * speed * t) * panDepth
+          `pan=stereo|
+           FL < ${1 - panDepth}*FC + ${panDepth}*FC*sin(2*PI*${speed}*t)|
+           FR < ${1 - panDepth}*FC + ${panDepth}*FC*sin(2*PI*${speed}*t+PI)`
         ])
         .audioCodec('libmp3lame')
         .audioFrequency(44100)
@@ -92,7 +81,7 @@ export default async function handler(req, res) {
           resolve(true);
         });
 
-      command.outputOptions('-map', '[out]').save(outputPath);
+      command.save(outputPath);
     });
 
     // Send the converted file
