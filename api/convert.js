@@ -17,18 +17,17 @@ export default async function handler(req, res) {
   let outputPath = null;
 
   try {
-    const { fileUrl, speed = 0.8, panDepth = 0.8 } = req.body;
+    const { fileUrl, speed = 0.8 } = req.body;
     
     if (!fileUrl) {
       return res.status(400).send({ error: "Missing fileUrl" });
     }
 
     console.log("🔗 File URL:", fileUrl);
-    console.log("⚡ Speed:", speed, "Pan Depth:", panDepth);
 
     // Create unique file names
     const timestamp = Date.now();
-    inputPath = path.join("/tmp", `input_${timestamp}`);
+    inputPath = path.join("/tmp", `input_${timestamp}.oga`);
     outputPath = path.join("/tmp", `output_${timestamp}.mp3`);
 
     // Download the audio file
@@ -43,24 +42,28 @@ export default async function handler(req, res) {
     fs.writeFileSync(inputPath, audioResp.data);
     console.log("✅ Audio downloaded");
 
-    // Convert audio with 8D effect
+    // Convert audio with 8D effect using tremolo for panning
     console.log("🎧 Converting audio to 8D...");
     const clampedSpeed = Math.max(0.5, Math.min(parseFloat(speed), 2.0));
     
     await new Promise((resolve, reject) => {
       ffmpeg(inputPath)
         .audioFilters([
-          `apulsator=hz=0.5:offset=${panDepth}`,
-          `atempo=${clampedSpeed}`,
+          // 8D audio effect using tremolo for auto-panning
+          `tremolo=f=0.5:d=0.8`,
+          `atempo=${clampedSpeed}`
         ])
         .audioCodec('libmp3lame')
         .audioFrequency(44100)
         .audioChannels(2)
+        .audioBitrate('128k')
         .on("start", (commandLine) => {
           console.log('FFmpeg command:', commandLine);
         })
         .on("progress", (progress) => {
-          console.log(`Processing: ${progress.percent}% done`);
+          if (progress.percent) {
+            console.log(`Processing: ${Math.round(progress.percent)}% done`);
+          }
         })
         .on("error", (err) => {
           console.error("❌ Conversion failed:", err);
