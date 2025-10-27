@@ -61,25 +61,25 @@ export default async function handler(req, res) {
     let fileName = "audio";
     let fileType = "unknown";
 
-    if (update.message.audio) {
-      fileId = update.message.audio.file_id;
-      fileName = update.message.audio.file_name || "audio_file";
-      fileType = "audio";
-      console.log("🎵 Audio file detected:", fileName);
-    } else if (update.message.voice) {
-      fileId = update.message.voice.file_id;
-      fileName = "voice_message";
-      fileType = "voice";
-      console.log("🎤 Voice message detected");
-    } else if (update.message.document) {
-      const mimeType = update.message.document.mime_type || "";
-      if (mimeType.startsWith("audio/")) {
-        fileId = update.message.document.file_id;
-        fileName = update.message.document.file_name || "audio_document";
-        fileType = "document";
-        console.log("📄 Audio document detected:", fileName);
-      }
-    }
+    // 👀 React to user's audio message
+if (fileId) {
+  try {
+    await axios.post(`${TELEGRAM_API}/setMessageReaction`, {
+      chat_id: chatId,
+      message_id: update.message.message_id,
+      reaction: [
+        {
+          type: "emoji",
+          emoji: "👀"
+        }
+      ]
+    });
+    console.log("👀 Reacted to audio message!");
+  } catch (reactionError) {
+    console.error("⚠️ Failed to react to message:", reactionError.message);
+  }
+}
+
 
     if (!fileId) {
       await axios.post(`${TELEGRAM_API}/sendMessage`, {
@@ -144,7 +144,7 @@ export default async function handler(req, res) {
       await axios.post(`${TELEGRAM_API}/editMessageText`, {
         chat_id: chatId,
         message_id: processingMessageId,
-        text: "⏳ Extractong processed audio from Cloud... 📤"
+        text: "⏳ Extractong processed audio from Cloud... ☁️"
       });
 
       // Prepare output filename
