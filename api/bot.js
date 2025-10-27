@@ -37,18 +37,16 @@ export default async function handler(req, res) {
         });
         return res.status(200).json({ status: "Start processed" });
       }
-// for help command
+
       if (text === '/help') {
-  await axios.post(`${TELEGRAM_API}/sendMessage`, {
-    chat_id: chatId,
-    text: `🤖 <b>How to use this bot:</b>\n\n1. Send an audio file (MP3, OGG, M4A, etc.)\n2. Send a voice message\n3. Send audio as a document\n\nI'll process it and send back the audio with enhanced sound!\n\n<b>Supported formats:</b>\n• Audio files (up to 20MB)\n• Voice messages\n• Audio documents\n\n<b>Commands:</b>\n/start - Welcome message\n/help - This help message\n\nEnjoy the music! 🎧\n\n💬 Drop your issues at @coder_ismail`,
-    parse_mode: "HTML"
-  });
-  return res.status(200).json({ status: "Help processed" });
-}
+        await axios.post(`${TELEGRAM_API}/sendMessage`, {
+          chat_id: chatId,
+          text: `🤖 <b>How to use this bot:</b>\n\n1. Send an audio file (MP3, OGG, M4A, etc.)\n2. Send a voice message\n3. Send audio as a document\n\nI'll process it and send back the audio with enhanced sound!\n\n<b>Supported formats:</b>\n• Audio files (up to 20MB)\n• Voice messages\n• Audio documents\n\n<b>Commands:</b>\n/start - Welcome message\n/help - This help message\n\nEnjoy the music! 🎧\n\n💬 Drop your issues at @coder_ismail`,
+          parse_mode: "HTML"
+        });
+        return res.status(200).json({ status: "Help processed" });
+      }
 
-
-      // Unknown command
       await axios.post(`${TELEGRAM_API}/sendMessage`, {
         chat_id: chatId,
         text: "❓ Unknown command. Send /help for instructions or just send me an audio file! 🎵"
@@ -78,6 +76,20 @@ export default async function handler(req, res) {
         fileName = update.message.document.file_name || "audio_document";
         fileType = "document";
         console.log("📄 Audio document detected:", fileName);
+      }
+    }
+
+    // 👀 React to audio messages (new addition)
+    if (fileId) {
+      try {
+        await axios.post(`${TELEGRAM_API}/setMessageReaction`, {
+          chat_id: chatId,
+          message_id: update.message.message_id,
+          reaction: [{ type: "emoji", emoji: "👀" }]
+        });
+        console.log("👀 Reacted to audio message");
+      } catch (reactionError) {
+        console.warn("⚠️ Failed to react to message:", reactionError.message);
       }
     }
 
@@ -135,7 +147,7 @@ export default async function handler(req, res) {
       // Send to convert API
       const convertResponse = await axios.post(CONVERT_API, convertParams, {
         responseType: "arraybuffer",
-        timeout: 60000 // 60 seconds timeout
+        timeout: 60000
       });
 
       console.log("✅ Conversion successful! Response size:", convertResponse.data.length, "bytes");
@@ -144,14 +156,12 @@ export default async function handler(req, res) {
       await axios.post(`${TELEGRAM_API}/editMessageText`, {
         chat_id: chatId,
         message_id: processingMessageId,
-        text: "⏳ Extractong processed audio from Cloud... ☁️"
+        text: "⏳ Extracting processed audio from Cloud... ☁️"
       });
 
-      // Prepare output filename
-      const baseName = fileName.replace(/\.[^/.]+$/, ""); // Remove extension
+      const baseName = fileName.replace(/\.[^/.]+$/, "");
       const outputFileName = `8D_${baseName}.mp3`;
 
-      // Send converted audio back to user
       const formData = new FormData();
       formData.append("chat_id", chatId);
       formData.append("audio", convertResponse.data, {
@@ -170,7 +180,6 @@ export default async function handler(req, res) {
 
       console.log("✅ Audio sent successfully!");
 
-      // Update processing message to success
       await axios.post(`${TELEGRAM_API}/editMessageText`, {
         chat_id: chatId,
         message_id: processingMessageId,
@@ -183,7 +192,6 @@ export default async function handler(req, res) {
     } catch (conversionError) {
       console.error("❌ Conversion error:", conversionError.message);
 
-      // Error handling with specific messages
       let errorMessage = "❌ Sorry, I couldn't process your audio file. Please try again with a different file.";
 
       if (conversionError.code === 'ECONNABORTED') {
@@ -196,7 +204,6 @@ export default async function handler(req, res) {
         errorMessage = "🎵 Unsupported audio format. Please try with MP3, OGG, or other common audio formats.";
       }
 
-      // Update processing message with error
       await axios.post(`${TELEGRAM_API}/editMessageText`, {
         chat_id: chatId,
         message_id: processingMessageId,
@@ -210,7 +217,6 @@ export default async function handler(req, res) {
     console.error("❌ Bot handler error:", error.message);
 
     try {
-      // Try to send error message to user
       if (req.body?.message?.chat?.id) {
         await axios.post(`${TELEGRAM_API}/sendMessage`, {
           chat_id: req.body.message.chat.id,
