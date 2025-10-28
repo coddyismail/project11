@@ -325,7 +325,9 @@ html {
   .nav-links span {
     font-size: 0.85rem;
   }
-
+.cta-buttons{
+  flex-direction: column;
+}
   .hero-text h1 {
     font-size: 1.6rem;
   }
@@ -400,7 +402,9 @@ html {
   .nav-links.open {
     right: 20px;
   }
-
+.cta-buttons{
+  flex-direction: column;
+}
   .nav-links span {
     font-size: 1.2rem;
     padding: 0.5rem 1rem;
