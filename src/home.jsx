@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, MeshDistortMaterial, Sphere } from "@react-three/drei";
 import "./Home.css";
+import { FaTelegramPlane } from "react-icons/fa";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -71,9 +72,14 @@ export default function Home() {
               </button>
               <button className="btn-secondary" onClick={() => scrollTo("about")}>
                  Learn More
-              </button><button className="btn-secondary" onClick={() => scrollTo("about")}>
-                 Open In Telegram
               </button>
+              <button
+      className="btn-secondary flex items-center gap-2"
+      onClick={() => window.open("https://t.me/eightdaudio_bot", "_blank")}
+    >
+      <FaTelegramPlane size={20} />
+      Open In Telegram
+    </button>
             </div>
           </div>
         </div>
