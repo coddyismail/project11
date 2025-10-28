@@ -73,13 +73,9 @@ export default function Home() {
               <button className="btn-secondary" onClick={() => scrollTo("about")}>
                  Learn More
               </button>
-                <button
+              <button
+      className="btn-secondary flex items-center gap-2"
       onClick={() => window.open("https://t.me/eightdaudio_bot", "_blank")}
-      className="flex items-center gap-2 text-white font-medium px-5 py-2 rounded-full shadow-md transition-transform duration-200 hover:scale-105"
-      style={{
-        backgroundImage:
-          "linear-gradient(270deg, rgba(100, 181, 239, 0) 48.44%, #64b5ef 75.52%, rgba(100, 181, 239, 0) 100%)",
-      }}
     >
       <FaTelegramPlane size={20} />
       Open In Telegram
