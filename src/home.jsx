@@ -71,6 +71,8 @@ export default function Home() {
               </button>
               <button className="btn-secondary" onClick={() => scrollTo("about")}>
                  Learn More
+              </button><button className="btn-secondary" onClick={() => scrollTo("about")}>
+                 Open In Telegram
               </button>
             </div>
           </div>
