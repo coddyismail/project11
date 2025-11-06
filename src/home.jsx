@@ -34,7 +34,7 @@ export default function Home() {
       {/* Navigation */}
      {/* Navigation */}
 <nav className="navbar">
-  <div className="nav-logo">🎧 8D Studio</div>
+  <div className="nav-logo"><img  class="logoname" src="https://cdn5.telesco.pe/file/Ga5hbiCmgpaoGKQ6V-YDy_uUBB9q2cA8O3_218ajE6Flot0foQm8wtpTNCn6yBIsEhV5ju23NsusMQEztBUMY0hFmy8LGUr3MvFBcxhDMUiKzqIfYHxPQFpdYbxFfDwJUn3f5Gdd4UBuB0jOUxaP26TrFq9YK4Cm2yvF-BzAv9CngoBREXn1QuWoy6mISaaxfPsZX_dxyrFmf_rtN_0gUzx7Yl6d6ZdRstCGsIoR0iuzZa2xeEQUdJjRuVUTOUG-ymRbCtJz6R5KU_QPkXOmRY14CmaEuUKIVv112XZLs1M2CpRuJ6ym9dnk1vmqjgROwCfO3mvZAwsrAtJkpLl1JA.jpg" alt="" /> 8D Audio</div>
 
   {/* Nav Links */}
   <div className={`nav-links ${menuOpen ? "open" : ""}`}>

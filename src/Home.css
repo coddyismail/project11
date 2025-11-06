@@ -34,10 +34,19 @@
 
 
 .nav-logo {
+  margin-top: -20px;
   font-size: 1.5rem;
   font-weight: bold;
 }
 
+.nav-logo img{
+  position: relative;
+  top: 15px;
+  left: -5px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+}
 .nav-links span {
   margin-left: 1.5rem;
   cursor: pointer;
@@ -275,7 +284,11 @@ html {
     padding: 0.6rem 1rem;
     border-radius: 15px;
   }
-
+ .nav-logo img{
+    position: relative;
+    left: -200px;
+    top: 30px;
+  }
   .nav-links {
     display: flex;
     flex-direction: column;
@@ -290,6 +303,7 @@ html {
   .hero-text h1 {
     font-size: 2rem;
   }
+  
 
   .hero-text p {
     font-size: 1rem;
@@ -315,6 +329,11 @@ html {
 
   .nav-logo {
     font-size: 1.2rem;
+  }
+  .nav-logo img{
+    position: relative;
+    left: -70px;
+    top: 30px;
   }
 
   .nav-links {
@@ -400,6 +419,7 @@ html {
   .nav-links.open {
     right: 20px;
   }
+ 
 
   .nav-links span {
     font-size: 1.2rem;
