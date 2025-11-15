@@ -419,8 +419,13 @@ html {
   .nav-links.open {
     right: 20px;
   }
+  .cta-buttons{
+    flex-direction: column;
+  }
  
-
+.navbar{
+  width: 90%;
+}
   .nav-links span {
     font-size: 1.2rem;
     padding: 0.5rem 1rem;
