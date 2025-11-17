@@ -1,9 +1,7 @@
 import axios from "axios";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegPath from "ffmpeg-static";
-import fs from "fs";
-import path from "path";
-import os from "os";
+import { Readable } from "stream";
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
@@ -15,77 +13,59 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { fileUrl } = req.body;
-    if (!fileUrl) return res.status(400).json({ error: "Missing fileUrl" });
+    const { fileUrl, speed = 0.05, panDepth = 0.8 } = req.body;
+    if (!fileUrl) {
+      return res.status(400).json({ error: "Missing fileUrl" });
+    }
 
     console.log("🔗 File URL:", fileUrl);
+    console.log("⚡ Speed:", speed, "Pan Depth:", panDepth);
 
-    // Temp file paths
-    const tempInput = path.join(os.tmpdir(), `input_${Date.now()}.ogg`);
-    const tempOutput = path.join(os.tmpdir(), `output_${Date.now()}.mp3`);
-
-    // Step 1: Download Telegram file to disk
-    console.log("📥 Downloading...");
-    const response = await axios({
-      url: fileUrl,
+    // Download audio
+    console.log("📥 Downloading audio...");
+    const audioResponse = await axios({
       method: "GET",
-      responseType: "stream",
-      timeout: 60000,
+      url: fileUrl,
+      responseType: "arraybuffer",
+      timeout: 45000
     });
 
-    await new Promise((resolve, reject) => {
-      const writer = fs.createWriteStream(tempInput);
-      response.data.pipe(writer);
-      writer.on("finish", resolve);
-      writer.on("error", reject);
-    });
+    console.log("✅ Audio downloaded, size:", audioResponse.data.length, "bytes");
 
-    console.log("✅ File saved locally:", tempInput);
+    const inputStream = Readable.from(audioResponse.data);
 
-    // Step 2: Convert to proper MP3 first (fixes Telegram-encoded OGG)
-    const fixedInput = path.join(os.tmpdir(), `fixed_${Date.now()}.mp3`);
-    await new Promise((resolve, reject) => {
-      ffmpeg(tempInput)
-        .setFfmpegPath(ffmpegPath)
-        .noVideo()
-        .audioCodec("libmp3lame")
-        .audioBitrate("192k")
-        .on("end", resolve)
-        .on("error", reject)
-        .save(fixedInput);
-    });
-
-    console.log("🔧 Pre-conversion successful:", fixedInput);
-
-    // Step 3: Apply 8D effect
-    await new Promise((resolve, reject) => {
-      ffmpeg(fixedInput)
-        .setFfmpegPath(ffmpegPath)
-        .audioFilters("apulsator=hz=0.08")
-        .audioCodec("libmp3lame")
-        .audioBitrate("192k")
-        .toFormat("mp3")
-        .on("error", reject)
-        .on("end", resolve)
-        .save(tempOutput);
-    });
-
-    console.log("✅ 8D Conversion complete:", tempOutput);
-
-    // Step 4: Send final audio
+    // Process with ffmpeg (basic 8D pan effect)
     res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Content-Disposition", "attachment; filename=8d_audio.mp3");
 
-    const stream = fs.createReadStream(tempOutput);
-    stream.pipe(res);
+    ffmpeg(inputStream)
+      .audioFilters([
+        {
+          filter: "apulsator",
+          options: { hz: 0.125 } // creates rotating pan effect
+        }
+      ])
+      .format("mp3")
+      .on("start", cmd => console.log("🎧 FFmpeg started:", cmd))
+      .on("error", err => {
+        console.error("❌ Conversion failed:", err.message);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Conversion failed: " + err.message });
+        }
+      })
+      .on("end", () => console.log("✅ Conversion complete"))
+      .pipe(res, { end: true });
 
-    stream.on("close", () => {
-      fs.unlink(tempInput, () => {});
-      fs.unlink(tempOutput, () => {});
-      fs.unlink(fixedInput, () => {});
-    });
   } catch (err) {
-    console.error("❌ Conversion failed:", err.message);
+    console.error("❌ Processing failed:", err.message);
+
+    if (err.code === "ECONNABORTED") {
+      return res.status(408).json({ error: "Download timeout" });
+    }
+    if (err.response?.status === 404) {
+      return res.status(404).json({ error: "Audio file not found" });
+    }
+
     res.status(500).json({ error: "Conversion failed: " + err.message });
   }
 }
