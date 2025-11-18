@@ -198,7 +198,7 @@ if (baseName.includes("–")) {
       formData.append("title", `${title} (8D)`);
 formData.append("performer", artist);
 
-      formData.append("caption", "🎧 Your processed audio is ready! Enjoy the enhanced sound experience!");
+      formData.append("caption", "🎧 Your processed audio is ready! Enjoy the enhanced sound experience! Via @eightdaudio_bot");
 
       console.log("📤 Sending audio to Telegram...");
       await axios.post(`${TELEGRAM_API}/sendAudio`, formData, {
