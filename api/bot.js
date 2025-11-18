@@ -77,8 +77,8 @@ if (fileName.includes(".")) {
 baseName = baseName.replace(/[_-]+/g, " ").trim();
 
 // Detect artist and title if format: "Artist – Title"
-artist = "Unknown Artist";  // <-- assign, don't declare
-title = baseName;           // <-- assign, don't declare
+artist = "Unknown Artist";  
+title = baseName;           
 
 if (baseName.includes("–")) {
   const parts = baseName.split("–").map(s => s.trim());
@@ -131,7 +131,7 @@ if (baseName.includes("–")) {
     // Send processing message
     const processingMessage = await axios.post(`${TELEGRAM_API}/sendMessage`, {
       chat_id: chatId,
-      text: "⏳ Downloading and processing your audio... Please wait a moment! 🔄",
+      text: "📤 Sending Your Audio on Server... Please wait a moment! 🔄",
       parse_mode: "HTML"
     });
 
@@ -159,7 +159,7 @@ if (baseName.includes("–")) {
       await axios.post(`${TELEGRAM_API}/editMessageText`, {
         chat_id: chatId,
         message_id: processingMessageId,
-        text: "⏳ Processing your audio... Converting to 8D effect 🎧"
+        text: "⚛ Engine Working On Your Audio... Converting to 8D effect 🎧"
       });
 
       // Prepare conversion parameters
