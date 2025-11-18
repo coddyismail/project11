@@ -62,31 +62,31 @@ export default async function handler(req, res) {
     if (update.message.audio) {
       fileId = update.message.audio.file_id;
       fileName = update.message.audio.file_name || "audio_file";
+      // ---------------- METADATA EXTRACTION ----------------
+
+// Extract base name without extension
+let baseName = fileName;
+if (fileName.includes(".")) {
+  baseName = fileName.substring(0, fileName.lastIndexOf("."));
+}
+
+// Clean weird characters
+baseName = baseName.replace(/[_-]+/g, " ").trim();
+
+// Detect artist and title if format: "Artist – Title"
+let artist = "Unknown Artist";
+let title = baseName;
+
+if (baseName.includes("–")) {
+  const parts = baseName.split("–").map(s => s.trim());
+  if (parts.length >= 2) {
+    artist = parts[0];
+    title = parts.slice(1).join(" – ");
+  }
+}
+
       fileType = "audio";
       console.log("🎵 Audio file detected:", fileName);
-       // ---------------- METADATA EXTRACTION ----------------
-  let baseName = fileName;
-  if (fileName.includes(".")) {
-    baseName = fileName.substring(0, fileName.lastIndexOf("."));
-  }
-
-  // Clean weird characters
-  baseName = baseName.replace(/[_-]+/g, " ").trim();
-
-  // Detect artist and title if format: "Artist – Title"
-  let artist = "Unknown Artist";
-  let title = baseName;
-
-  if (baseName.includes("–")) {
-    const parts = baseName.split("–").map(s => s.trim());
-    if (parts.length >= 2) {
-      artist = parts[0];
-      title = parts.slice(1).join(" – ");
-    }
-  }
-
-  
-}
     } else if (update.message.voice) {
       fileId = update.message.voice.file_id;
       fileName = "voice_message";
@@ -191,9 +191,9 @@ export default async function handler(req, res) {
         filename: outputFileName,
         contentType: "audio/mpeg"
       });
-      // puting song title given by user!!
       formData.append("title", `${title} (8D)`);
-      formData.append("performer", artist);
+formData.append("performer", artist);
+
       formData.append("caption", "🎧 Your processed audio is ready! Enjoy the enhanced sound experience!");
 
       console.log("📤 Sending audio to Telegram...");
