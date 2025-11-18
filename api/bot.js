@@ -58,6 +58,9 @@ export default async function handler(req, res) {
     let fileId = null;
     let fileName = "audio";
     let fileType = "unknown";
+    let artist = "Unknown Artist";
+let title = "Unknown Title";
+
 
     if (update.message.audio) {
       fileId = update.message.audio.file_id;
@@ -74,8 +77,8 @@ if (fileName.includes(".")) {
 baseName = baseName.replace(/[_-]+/g, " ").trim();
 
 // Detect artist and title if format: "Artist – Title"
-let artist = "Unknown Artist";
-let title = baseName;
+artist = "Unknown Artist";  // <-- assign, don't declare
+title = baseName;           // <-- assign, don't declare
 
 if (baseName.includes("–")) {
   const parts = baseName.split("–").map(s => s.trim());
@@ -84,6 +87,7 @@ if (baseName.includes("–")) {
     title = parts.slice(1).join(" – ");
   }
 }
+
 
       fileType = "audio";
       console.log("🎵 Audio file detected:", fileName);
@@ -182,8 +186,8 @@ if (baseName.includes("–")) {
         text: "⏳ Extracting processed audio from Cloud... ☁️"
       });
 
-      const baseName = fileName.replace(/\.[^/.]+$/, "");
-      const outputFileName = `8D_${baseName}.mp3`;
+      
+      const outputFileName = `8D_${fileName.replace(/\.[^/.]+$/, "")}.mp3`;
 
       const formData = new FormData();
       formData.append("chat_id", chatId);
@@ -216,7 +220,7 @@ formData.append("performer", artist);
     } catch (conversionError) {
       console.error("❌ Conversion error:", conversionError.message);
 
-      let errorMessage = "❌ Sorry, I couldn't process your audio file. Please try again with a different file.";
+      let errorMessage = "❌ Sorry, I couldn't process your audio file. Please try again with a different file. ";
 
       if (conversionError.code === 'ECONNABORTED') {
         errorMessage = "⏰ Processing took too long. Please try again with a shorter audio file.";
