@@ -211,7 +211,7 @@ formData.append("performer", artist);
       await axios.post(`${TELEGRAM_API}/editMessageText`, {
         chat_id: chatId,
         message_id: processingMessageId,
-        text: "✅ <b>Processing Complete!</b>\n\nYour audio has been successfully processed! 🎉\n\nSend another audio file to continue! 🎵",
+        text: "✅ <b>Processing Complete!</b>\n\nYour audio has been successfully processed! 🎉\n\nSend another audio file to continue! 🎵 \n\n Use Headphones",
         parse_mode: "HTML"
       });
 
@@ -220,7 +220,7 @@ formData.append("performer", artist);
     } catch (conversionError) {
       console.error("❌ Conversion error:", conversionError.message);
 
-      let errorMessage = "❌ Sorry, I couldn't process your audio file. Please try again with a different file. ";
+      let errorMessage = "❌ Engine Failed To Perform Operation!! Please try again with a different file. ";
 
       if (conversionError.code === 'ECONNABORTED') {
         errorMessage = "⏰ Processing took too long. Please try again with a shorter audio file.";
