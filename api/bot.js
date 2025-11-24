@@ -119,8 +119,9 @@ if (baseName.includes("–")) {
         console.warn("⚠️ Failed to react to message:", reactionError.message);
       }
     }
+// reacting for engine failure
+   let errorMessage = "❌ Engine Failed To Perform Operation!! Please try again with a different file. \n Error Code ZEB3081 ";
 
-   
 
     if (errorMessage) {
       try {
