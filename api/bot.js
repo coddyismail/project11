@@ -120,7 +120,7 @@ if (baseName.includes("–")) {
       }
     }
 
-    errorMessage
+   
 
     if (errorMessage) {
       try {
