@@ -120,6 +120,21 @@ if (baseName.includes("–")) {
       }
     }
 
+    errorMessage
+
+    if (errorMessage) {
+      try {
+        await axios.post(`${TELEGRAM_API}/setMessageReaction`, {
+          chat_id: chatId,
+          message_id: update.message.message_id,
+          reaction: [{ type: "emoji", emoji: "😬" }]
+        });
+        console.log("😬 Reacted to audio message");
+      } catch (reactionError) {
+        console.warn("⚠️ Failed to react to message:", reactionError.message);
+      }
+    }
+
     if (!fileId) {
       await axios.post(`${TELEGRAM_API}/sendMessage`, {
         chat_id: chatId,
