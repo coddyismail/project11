@@ -196,15 +196,22 @@ if (baseName.includes("–")) {
       console.log("✅ Conversion successful! Response size:", convertResponse.data.length, "bytes");
 
       // Update processing message
-     await axios.post(`${TELEGRAM_API}/sendChatAction`, {
-  chat_id: chatId,
-  action: "upload_audio"
-});
+     // 1️⃣ Show typing/upload indicator
+    await axios.post(`${TELEGRAM_API}/sendChatAction`, {
+      chat_id: chatId,
+      action: "upload_audio"
+    });
 
-const processingMsg = await axios.post(`${TELEGRAM_API}/sendMessage`, {
-  chat_id: chatId,
-  text: "⏳ Extracting processed audio from Cloud... ☁️"
-});
+    // 2️⃣ Show cloud processing message
+    const processingMsg = await axios.post(`${TELEGRAM_API}/sendMessage`, {
+      chat_id: chatId,
+      text: "⏳ Extracting processed audio from Cloud... ☁️"
+    });
+    // delete msg
+await axios.post(`${TELEGRAM_API}/deleteMessage`, {
+      chat_id: chatId,
+      message_id: processingMsg.data.result.message_id
+    });
 
 
       
