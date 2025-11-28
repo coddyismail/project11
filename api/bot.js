@@ -196,11 +196,16 @@ if (baseName.includes("–")) {
       console.log("✅ Conversion successful! Response size:", convertResponse.data.length, "bytes");
 
       // Update processing message
-      await axios.post(`${TELEGRAM_API}/editMessageText`, {
-        chat_id: chatId,
-        message_id: processingMessageId,
-        text: "⏳ Extracting processed audio from Cloud... ☁️"
-      });
+     // Step: Extracting processed audio
+await axios.post(`${TELEGRAM_API}/editMessageText`, {
+  chat_id: chatId,
+  message_id: processingMessageId,
+  text: "⏳ Extracting processed audio from Cloud... ☁️"
+});
+
+// Show Telegram action only at this moment:
+await sendChatAction(chatId, "upload_audio");
+
 
       
       const outputFileName = `8D_${fileName.replace(/\.[^/.]+$/, "")}.mp3`;
