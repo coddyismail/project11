@@ -5,6 +5,19 @@ const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${TOKEN}`;
 const CONVERT_API = "https://project911-flame.vercel.app/api/convert";
 
+// Helper: send chat action safely
+async function sendChatAction(chatId, action) {
+  try {
+    await axios.post(`${TELEGRAM_API}/sendChatAction`, {
+      chat_id: chatId,
+      action
+    });
+  } catch (err) {
+    // don't throw — chat action is cosmetic, log and continue
+    console.warn("⚠️ sendChatAction failed:", err?.message || err);
+  }
+}
+
 export default async function handler(req, res) {
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
@@ -59,7 +72,7 @@ export default async function handler(req, res) {
     let fileName = "audio";
     let fileType = "unknown";
     let artist = "Unknown Artist";
-let title = "Unknown Title";
+    let title = "Unknown Title";
 
 
     if (update.message.audio) {
@@ -67,27 +80,26 @@ let title = "Unknown Title";
       fileName = update.message.audio.file_name || "audio_file";
       // ---------------- METADATA EXTRACTION ----------------
 
-// Extract base name without extension
-let baseName = fileName;
-if (fileName.includes(".")) {
-  baseName = fileName.substring(0, fileName.lastIndexOf("."));
-}
+      // Extract base name without extension
+      let baseName = fileName;
+      if (fileName.includes(".")) {
+        baseName = fileName.substring(0, fileName.lastIndexOf("."));
+      }
 
-// Clean weird characters
-baseName = baseName.replace(/[_-]+/g, " ").trim();
+      // Clean weird characters
+      baseName = baseName.replace(/[_-]+/g, " ").trim();
 
-// Detect artist and title if format: "Artist – Title"
-artist = "Unknown Artist";  
-title = baseName;           
+      // Detect artist and title if format: "Artist – Title"
+      artist = "Unknown Artist";
+      title = baseName;
 
-if (baseName.includes("–")) {
-  const parts = baseName.split("–").map(s => s.trim());
-  if (parts.length >= 2) {
-    artist = parts[0];
-    title = parts.slice(1).join(" – ");
-  }
-}
-
+      if (baseName.includes("–")) {
+        const parts = baseName.split("–").map(s => s.trim());
+        if (parts.length >= 2) {
+          artist = parts[0];
+          title = parts.slice(1).join(" – ");
+        }
+      }
 
       fileType = "audio";
       console.log("🎵 Audio file detected:", fileName);
@@ -119,9 +131,8 @@ if (baseName.includes("–")) {
         console.warn("⚠️ Failed to react to message:", reactionError.message);
       }
     }
-// reacting for engine failure
-   let errorMessage = "❌ Engine Failed To Perform Operation!! Please try again with a different file. \n Error Code ZEB3081 ";
-
+    // reacting for engine failure
+    let errorMessage = "❌ Engine Failed To Perform Operation!! Please try again with a different file. \n Error Code ZEB3081 ";
 
     if (errorMessage) {
       try {
@@ -158,7 +169,7 @@ if (baseName.includes("–")) {
       console.log("📁 Getting file info from Telegram...");
       const fileInfoResponse = await axios.get(`${TELEGRAM_API}/getFile?file_id=${fileId}`);
       const fileInfo = fileInfoResponse.data;
-      
+
       if (!fileInfo.ok) {
         throw new Error("Failed to get file info from Telegram");
       }
@@ -196,18 +207,18 @@ if (baseName.includes("–")) {
       console.log("✅ Conversion successful! Response size:", convertResponse.data.length, "bytes");
 
       // Update processing message
-     // Step: Extracting processed audio
-await axios.post(`${TELEGRAM_API}/editMessageText`, {
-  chat_id: chatId,
-  message_id: processingMessageId,
-  text: "⏳ Extracting processed audio from Cloud... ☁️"
-});
+      // Step: Extracting processed audio
+      await axios.post(`${TELEGRAM_API}/editMessageText`, {
+        chat_id: chatId,
+        message_id: processingMessageId,
+        text: "⏳ Extracting processed audio from Cloud... ☁️"
+      });
 
-// Show Telegram action only at this moment:
-await sendChatAction(chatId, "upload_audio");
+      // Show Telegram action only at this moment:
+      // safe call so it won't crash on error
+      await sendChatAction(chatId, "upload_audio");
 
 
-      
       const outputFileName = `8D_${fileName.replace(/\.[^/.]+$/, "")}.mp3`;
 
       const formData = new FormData();
@@ -217,10 +228,10 @@ await sendChatAction(chatId, "upload_audio");
         contentType: "audio/mpeg"
       });
       formData.append("title", `${title} (8D)`);
-formData.append("performer", artist);
-   
+      formData.append("performer", artist);
+
       formData.append("caption", "🎧 Your processed audio is ready! Enjoy the enhanced sound experience! Via @eightdaudio_bot  ", convertResponse.data.length);
- 
+
       console.log("📤 Sending audio to Telegram...");
       await axios.post(`${TELEGRAM_API}/sendAudio`, formData, {
         headers: formData.getHeaders(),
