@@ -196,11 +196,16 @@ if (baseName.includes("–")) {
       console.log("✅ Conversion successful! Response size:", convertResponse.data.length, "bytes");
 
       // Update processing message
-      await axios.post(`${TELEGRAM_API}/editMessageText`, {
-        chat_id: chatId,
-        message_id: processingMessageId,
-        text: "⏳ Extracting processed audio from Cloud... ☁️"
-      });
+     await axios.post(`${TELEGRAM_API}/sendChatAction`, {
+  chat_id: chatId,
+  action: "upload_audio"
+});
+
+const processingMsg = await axios.post(`${TELEGRAM_API}/sendMessage`, {
+  chat_id: chatId,
+  text: "⏳ Extracting processed audio from Cloud... ☁️"
+});
+
 
       
       const outputFileName = `8D_${fileName.replace(/\.[^/.]+$/, "")}.mp3`;
