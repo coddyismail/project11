@@ -181,7 +181,7 @@ export default async function handler(req, res) {
 
       const filePath = fileInfo.result.file_path;
       const fileUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
-      const fileSize = fileInfo.result.file_size;
+      let fileSize = fileInfo.result.file_size;
 
       console.log("🔗 File URL:", fileUrl);
       console.log("📊 File size:", fileSize, "bytes");
