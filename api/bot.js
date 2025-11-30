@@ -237,7 +237,7 @@ const humanSize =
 
       const formData = new FormData();
       formData.append("chat_id", chatId);
-      formData.append("audio", convertResponse.data, {
+      formData.append("audio", audioBuffer, {
         filename: outputFileName,
         contentType: "audio/mpeg"
       });
