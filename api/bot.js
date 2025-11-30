@@ -150,21 +150,7 @@ export default async function handler(req, res) {
         console.warn("⚠️ Failed to react to message:", reactionError.message);
       }
     }
-    // reacting for engine failure
-    let errorMessage = "❌ Engine Failed To Perform Operation!! Please try again with a different file. \n Error Code ZEB3081 ";
-
-    if (errorMessage) {
-      try {
-        await axios.post(`${TELEGRAM_API}/setMessageReaction`, {
-          chat_id: chatId,
-          message_id: update.message.message_id,
-          reaction: [{ type: "emoji", emoji: "😬" }]
-        });
-        console.log("😬 Reacted to audio message");
-      } catch (reactionError) {
-        console.warn("⚠️ Failed to react to message:", reactionError.message);
-      }
-    }
+    
 
     if (!fileId) {
       await axios.post(`${TELEGRAM_API}/sendMessage`, {
