@@ -235,7 +235,7 @@ export default async function handler(req, res) {
       formData.append("title", `${title} (8D)`);
       formData.append("performer", artist);
 
-      formData.append("caption", "🎧 Your processed audio is ready! Enjoy the enhanced sound experience! Via @eightdaudio_bot  ", convertResponse.data.length);
+      formData.append("caption", "🎧 Your processed audio is ready! Enjoy the enhanced sound experience! Via @eightdaudio_bot  ", fileSize, "bytes");
 
       console.log("📤 Sending audio to Telegram...");
       await axios.post(`${TELEGRAM_API}/sendAudio`, formData, {
