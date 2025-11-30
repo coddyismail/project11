@@ -150,7 +150,7 @@ export default async function handler(req, res) {
         console.warn("⚠️ Failed to react to message:", reactionError.message);
       }
     }
-    
+
 
     if (!fileId) {
       await axios.post(`${TELEGRAM_API}/sendMessage`, {
@@ -181,7 +181,7 @@ export default async function handler(req, res) {
 
       const filePath = fileInfo.result.file_path;
       const fileUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
-      let fileSize = fileInfo.result.file_size;
+      const fileSize = fileInfo.result.file_size;
 
       console.log("🔗 File URL:", fileUrl);
       console.log("📊 File size:", fileSize, "bytes");
@@ -223,7 +223,16 @@ export default async function handler(req, res) {
       // safe call so it won't crash on error
       await sendChatAction(chatId, "upload_audio");
 
+ // Convert ArrayBuffer → Buffer
+const audioBuffer = Buffer.from(convertResponse.data);
 
+// Human-readable file size
+const humanSize =
+  fileSize < 1024
+    ? `${fileSize} bytes`
+    : fileSize < 1024 * 1024
+    ? `${(fileSize / 1024).toFixed(1)} KB`
+    : `${(fileSize / (1024 * 1024)).toFixed(1)} MB`;
       const outputFileName = `8D_${fileName.replace(/\.[^/.]+$/, "")}.mp3`;
 
       const formData = new FormData();
@@ -233,9 +242,12 @@ export default async function handler(req, res) {
         contentType: "audio/mpeg"
       });
       formData.append("title", `${title} (8D)`);
+
       formData.append("performer", artist);
 
-      formData.append("caption", "🎧 Your processed audio is ready! Enjoy the enhanced sound experience! Via @eightdaudio_bot  ", fileSize, "bytes");
+
+      formData.append("caption",
+  `🎧 Your 8D audio is ready!\n\n• Original File Size: ${humanSize}\n• Enhanced Version Generated\n\nEnjoy the immersive sound! 🔊\nVia @eightdaudio_bot`);
 
       console.log("📤 Sending audio to Telegram...");
       await axios.post(`${TELEGRAM_API}/sendAudio`, formData, {
