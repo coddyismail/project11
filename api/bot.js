@@ -247,7 +247,7 @@ const humanSize =
 
 
       formData.append("caption",
-  `🎧 Your 8D audio is ready!\n\n• Original File Size: ${humanSize}\n• Enhanced Version Generated\n\nEnjoy the immersive sound! 🔊\nVia @eightdaudio_bot`);
+  `🎧 Your 8D audio is ready!\n\n• Original File Size: ${humanSize}\n• Enhanced Version Generated\n\nEnjoy the immersive sound! 🔊\nVia @eightdaudio_bot \n Join Our channel for new bots and updates`);
 
       console.log("📤 Sending audio to Telegram...");
       await axios.post(`${TELEGRAM_API}/sendAudio`, formData, {
@@ -258,7 +258,7 @@ const humanSize =
       inline_keyboard: [
         [
           {
-            text: "🔷  Join our channel for new bots and updates CubenixWeb  🔷",
+            text: "🔷  Join Now  🔷",
             url: "https://t.me/cubenixweb"
           }
         ]
