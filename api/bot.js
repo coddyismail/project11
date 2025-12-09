@@ -251,9 +251,22 @@ const humanSize =
 
       console.log("📤 Sending audio to Telegram...");
       await axios.post(`${TELEGRAM_API}/sendAudio`, formData, {
-        headers: formData.getHeaders(),
-        timeout: 30000
-      });
+  headers: formData.getHeaders(),
+  timeout: 30000,
+  params: {
+    reply_markup: JSON.stringify({
+      inline_keyboard: [
+        [
+          {
+            text: "🔷  Join our channel for new bots and updates CubenixWeb  🔷",
+            url: "https://t.me/cubenixweb"
+          }
+        ]
+      ]
+    })
+  }
+});
+
 
       console.log("✅ Audio sent successfully!");
 
