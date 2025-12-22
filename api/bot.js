@@ -73,7 +73,7 @@ export default async function handler(req, res) {
       if (text === '/help') {
         await axios.post(`${TELEGRAM_API}/sendMessage`, {
           chat_id: chatId,
-          text: `🤖 <b>How to use this bot:</b>\n\n1. Send an audio file (MP3, OGG, M4A, etc.)\n2. Send a voice message\n3. Send audio as a document\n\nI'll process it and send back the audio with enhanced sound!\n\n<b>Supported formats:</b>\n• Audio files (up to 20MB)\n• Voice messages\n• Audio documents\n\n<b>Commands:</b>\n/start - Welcome message\n/help - This help message\n\nEnjoy the music! 🎧\n\n💬 Drop your issues at @coder_ismail`,
+          text: `🤖 <b>How to use this bot:</b>\n\n1. Send an audio file (MP3, OGG, M4A, etc.)\n2. Send a voice message\n3. Send audio as a document\n\nI'll process it and send back the audio with enhanced sound!\n\n<b>Supported formats:</b>\n• Audio files (up to 20MB)\n• Voice messages\n• Audio documents\n\n<b>Commands:</b>\n/start - Welcome message\n/help - This help message\n\nEnjoy the music! 🎧\n\n💬 Drop your issues at @coderismaeel`,
           parse_mode: "HTML"
         });
         return res.status(200).json({ status: "Help processed" });
