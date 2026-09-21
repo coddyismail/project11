@@ -122,7 +122,7 @@ export default function Home() {
         <div className="faq-item">
           <h3>Is it free?</h3>
           <p>
-            Yes — Compleatly Free, Garib Ke liye hai
+            Yes — Compleatly Free
           </p>
         </div>
       </section>
@@ -131,7 +131,8 @@ export default function Home() {
       <footer className="home-footer">
         <p>© 2025 8D Audio Studio. All rights reserved.</p>
         <div className="social-links">
-         <a className="atkmbg" href="https://www.instagram.com/coderismail"> <span>Instagram</span></a> | <a className="atkmbg" href="https://www.github.com/coddyismail"> <span>GitHub</span></a>
+         <a className="atkmbg" href="https://www.instagram.com/webwhale.in"> <span>Instagram</span></a> | <a className="atkmbg" href="https://www.github.com/coddyismail"> <span>GitHub</span></a>
+         <span>A Product of Webwhale</span>
         </div>
       </footer>
     </div>
